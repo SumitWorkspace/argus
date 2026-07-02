@@ -3,6 +3,14 @@
 ## Project Overview
 This project is an end-to-end Machine Learning pipeline for credit card fraud detection. It trains an XGBoost classifier on the Kaggle Credit Card Fraud dataset, serves predictions via a FastAPI endpoint, detects data drift in production requests, and packages the entire system inside Docker.
 
+## Dashboard Preview
+
+![Argus Dashboard](dashboard-screenshot.png)
+
+> Live monitoring dashboard showing real-time fraud 
+> probability trends, drift detection alerts, and 
+> transaction feed — served via Dockerized FastAPI endpoint.
+
 ## How to Train the Model
 Run the training script to load the data, scale numeric columns, train the XGBoost classifier, and generate the model and scaler artifacts:
 ```bash

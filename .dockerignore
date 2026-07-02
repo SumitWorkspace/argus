@@ -1,0 +1,5 @@
+creditcard.csv
+train.py
+__pycache__
+.venv
+*.ipynb

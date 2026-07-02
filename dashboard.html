@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Argus — Transaction Intelligence</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            /* GitHub Dark Theme Colors */
+            --bg-color: #0d1117;
+            --surface-color: #161b22;
+            --border-color: #21262d;
+            --text-primary: #e6edf3;
+            --text-muted: #8b949e;
+            
+            /* Accents */
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --accent-orange: #d29922;
+            --accent-teal: #00c896;
+            
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            --transition-speed: 0.2s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* API Status Indicator */
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .status-dot.pulsing::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: inherit;
+            animation: pulse-animation 1.5s infinite;
+        }
+
+        .api-status.offline {
+            color: var(--accent-red);
+        }
+
+        .api-status.offline .status-dot {
+            background-color: var(--accent-red);
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+
+        /* Main Workspace */
+        .main-content {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* Offline Banner Alert */
+        #offline-banner {
+            display: none;
+            background: linear-gradient(90deg, var(--accent-red), #b62b24);
+            color: #ffffff;
+            text-align: center;
+            padding: 0.6rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 200;
+            border-bottom: 1px solid var(--accent-red);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            position: sticky;
+            top: 0;
+        }
+
+        /* Top Header Area */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .top-bar h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .last-updated {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .refresh-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background-color var(--transition-speed), border-color var(--transition-speed);
+        }
+
+        .refresh-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted);
+        }
+
+        .refresh-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .refresh-btn.spinning svg {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Dashboard content body */
+        .dashboard-body {
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* 4-Card Grid */
+        .stat-cards-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 1100px) {
+            .stat-cards-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .stat-cards-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--surface-color) 0%, var(--bg-color) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.25rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed), border-color var(--transition-speed);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-card.model-status { border-left: 4px solid var(--accent-blue); }
+        .stat-card.total-predictions { border-left: 4px solid var(--accent-green); }
+        .stat-card.fraud-rate { border-left: 4px solid var(--accent-red); }
+        .stat-card.avg-prob { border-left: 4px solid var(--accent-purple); }
+
+        .card-header-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-icon {
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .stat-card.model-status .card-icon { color: var(--accent-blue); }
+        .stat-card.total-predictions .card-icon { color: var(--accent-green); }
+        .stat-card.fraud-rate .card-icon { color: var(--accent-red); }
+        .stat-card.avg-prob .card-icon { color: var(--accent-purple); }
+
+        .card-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .card-value.active { color: var(--accent-green); }
+        .card-value.offline { color: var(--accent-red); }
+
+        /* Panels layout grid (2 Columns) */
+        .panels-row {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 950px) {
+            .panels-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            min-height: 380px;
+        }
+
+        .panel-title-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        .panel-heading {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .panel-subheading {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        .panel-body {
+            flex-grow: 1;
+            position: relative;
+            min-height: 240px;
+        }
+
+        /* Line chart wrapper */
+        .chart-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Drift Monitor Widgets */
+        .drift-status-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.25rem 0.5rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .drift-status-badge.stable {
+            background-color: rgba(63, 185, 80, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .drift-status-badge.drifted {
+            background-color: rgba(248, 81, 73, 0.1);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .drift-panel-inner {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            gap: 1.5rem;
+        }
+
+        .drift-state-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .drift-alerts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            max-height: 160px;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        /* Custom scrollbar for alerts list */
+        .drift-alerts-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .drift-alerts-list::-webkit-scrollbar-thumb {
+            background-color: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .drift-alert-item {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-red);
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .drift-alert-desc {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .drift-alert-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: capitalize;
+        }
+
+        .drift-alert-nums {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .drift-alert-severity {
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--accent-red);
+            background-color: rgba(248, 81, 73, 0.15);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        .drift-nominal-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 0.5rem;
+            padding: 1.5rem 0;
+            color: var(--accent-green);
+        }
+
+        .drift-nominal-state svg {
+            width: 44px;
+            height: 44px;
+            color: var(--accent-green);
+        }
+
+        .drift-nominal-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .drift-nominal-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Drift Comparison Bars */
+        .drift-comparison-panel {
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .drift-comparison-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .drift-comparison-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .drift-bar-outer {
+            width: 100%;
+            height: 6px;
+            background-color: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .drift-bar-inner {
+            height: 100%;
+            background-color: var(--accent-blue);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .drift-bar-inner.red {
+            background-color: var(--accent-red);
+        }
+
+        /* Bottom Section Log Table */
+        .table-panel {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.8rem 1rem;
+            border-bottom: 2px solid var(--border-color);
+            background-color: var(--surface-color);
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            transition: background-color 0.15s ease;
+        }
+
+        tr:nth-child(even) td {
+            background-color: var(--bg-color);
+        }
+        
+        tr:nth-child(odd) td {
+            background-color: var(--surface-color);
+        }
+
+        tr:hover td {
+            background-color: rgba(88, 166, 255, 0.06) !important;
+        }
+
+        .id-cell {
+            font-family: monospace;
+            color: var(--text-muted);
+            cursor: help;
+        }
+
+        /* Badges */
+        .pill-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .pill-badge.risk-low { background-color: rgba(63, 185, 80, 0.1); color: var(--accent-green); border: 1px solid rgba(63, 185, 80, 0.25); }
+        .pill-badge.risk-medium { background-color: rgba(210, 153, 34, 0.1); color: var(--accent-orange); border: 1px solid rgba(210, 153, 34, 0.25); }
+        .pill-badge.risk-high { background-color: rgba(248, 81, 73, 0.1); color: var(--accent-red); border: 1px solid rgba(248, 81, 73, 0.25); }
+
+        .pill-badge.status-fraud { background-color: rgba(248, 81, 73, 0.1); color: var(--accent-red); border: 1px solid rgba(248, 81, 73, 0.25); }
+        .pill-badge.status-normal { background-color: rgba(0, 200, 150, 0.1); color: var(--accent-teal); border: 1px solid rgba(0, 200, 150, 0.25); }
+    </style>
+</head>
+<body>
+
+    <!-- Main Workspace Container -->
+    <main class="main-content">
+        <!-- Prominent Offline Indicator Banner -->
+        <div id="offline-banner">
+            ⚠️ API Connection Failure: Unable to connect to backend service http://localhost:8000
+        </div>
+
+        <!-- Header Top Bar -->
+        <section class="top-bar">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+                <div class="logo" style="display: flex; align-items: center; font-size: 2.2rem; font-weight: 600; font-family: 'Sora', sans-serif; color: #ffffff; letter-spacing: -0.03em;">
+                    <span style="font-size: 38px; margin-right: 12px; line-height: 1; display: inline-flex; align-items: center; background: linear-gradient(to bottom, #60a5fa, #2563eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">𓂀</span>
+                    <span style="line-height: 1;">Argus</span>
+                </div>
+            </div>
+            <div class="top-bar-actions">
+                <div class="api-status" id="sidebar-api-status" style="margin-right: 0.5rem;">
+                    <span class="status-dot pulsing" id="sidebar-dot"></span>
+                    <span id="sidebar-api-text">API: LIVE</span>
+                </div>
+                <span class="last-updated" id="last-updated">Last updated: --:--:--</span>
+                <button class="refresh-btn" id="refresh-button" onclick="fetchAndUpdate()" title="Refresh Dashboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                </button>
+            </div>
+        </section>
+
+        <!-- Dashboard Workspace Body -->
+        <div class="dashboard-body">
+            
+            <!-- Cards Section -->
+            <section class="stat-cards-row">
+                <!-- Status -->
+                <div class="stat-card model-status">
+                    <div class="card-header-inner">
+                        <span class="card-label">Model Status</span>
+                        <span class="card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                        </span>
+                    </div>
+                    <span class="card-value offline" id="card-model-status">Checking</span>
+                </div>
+                <!-- Volume -->
+                <div class="stat-card total-predictions">
+                    <div class="card-header-inner">
+                        <span class="card-label">Total Predictions</span>
+                        <span class="card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </span>
+                    </div>
+                    <span class="card-value" id="card-total-predictions">0</span>
+                </div>
+                <!-- Fraud rate -->
+                <div class="stat-card fraud-rate">
+                    <div class="card-header-inner">
+                        <span class="card-label">Recent Fraud Rate</span>
+                        <span class="card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        </span>
+                    </div>
+                    <span class="card-value" id="card-fraud-rate">0.00%</span>
+                </div>
+                <!-- Avg Probability -->
+                <div class="stat-card avg-prob">
+                    <div class="card-header-inner">
+                        <span class="card-label">Avg Fraud Score</span>
+                        <span class="card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                        </span>
+                    </div>
+                    <span class="card-value" id="card-avg-probability">0.00%</span>
+                </div>
+            </section>
+
+            <!-- Columns layout -->
+            <section class="panels-row">
+                <!-- Line Chart -->
+                <div class="panel">
+                    <div class="panel-title-container">
+                        <div>
+                            <h3 class="panel-heading">Transaction Volume</h3>
+                            <p class="panel-subheading">Fraud probability trend of the last 10 predictions</p>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="chart-wrapper">
+                            <canvas id="volumeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drift Monitor panel -->
+                <div class="panel">
+                    <div class="panel-title-container">
+                        <div>
+                            <h3 class="panel-heading">Drift Monitor</h3>
+                            <p class="panel-subheading">Feature deviation compared to baseline references</p>
+                        </div>
+                        <span class="drift-status-badge stable" id="drift-status-badge">Stable</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="drift-panel-inner">
+                            <div class="drift-state-wrapper" id="drift-state-box">
+                                <div class="drift-nominal-state">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                    <span class="drift-nominal-title">All Systems Nominal</span>
+                                    <span class="drift-nominal-sub">Baseline parameters align with production requests.</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Bottom rates comparison bars -->
+                            <div class="drift-comparison-panel">
+                                <div class="drift-comparison-row">
+                                    <div class="drift-comparison-label-row">
+                                        <span>Reference Fraud Rate</span>
+                                        <span id="comparison-ref-val">0.173%</span>
+                                    </div>
+                                    <div class="drift-bar-outer">
+                                        <div class="drift-bar-inner" id="comparison-ref-bar" style="width: 10%"></div>
+                                    </div>
+                                </div>
+                                <div class="drift-comparison-row">
+                                    <div class="drift-comparison-label-row">
+                                        <span>Recent Fraud Rate</span>
+                                        <span id="comparison-recent-val">0.00%</span>
+                                    </div>
+                                    <div class="drift-bar-outer">
+                                        <div class="drift-bar-inner" id="comparison-recent-bar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bottom Section Table -->
+            <section class="table-panel">
+                <div class="panel-title-container">
+                    <div>
+                        <h3 class="panel-heading">Live Transaction Feed</h3>
+                        <p class="panel-subheading">Most recent predicted transactions processed by the pipeline</p>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>Amount (₹)</th>
+                                <th>Fraud Probability</th>
+                                <th>Risk Level</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-rows">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                    Waiting for prediction logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+        let volumeChart = null;
+
+        // Initialize Line Chart
+        function initChart() {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+            gradient.addColorStop(0, 'rgba(88, 166, 255, 0.25)');
+            gradient.addColorStop(1, 'rgba(88, 166, 255, 0)');
+            
+            volumeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 10}, (_, i) => `Tx ${i+1}`),
+                    datasets: [{
+                        label: 'Probability',
+                        data: Array(10).fill(0),
+                        borderColor: '#58a6ff',
+                        borderWidth: 2,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#58a6ff',
+                        pointBorderColor: '#161b22',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#161b22',
+                            titleColor: '#e6edf3',
+                            bodyColor: '#8b949e',
+                            borderColor: '#21262d',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Prob: ${(context.raw * 100).toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#21262d', drawBorder: false },
+                            ticks: { color: '#8b949e', font: { family: 'Inter', size: 10 } }
+                        },
+                        y: {
+                            min: 0,
+                            max: 1,
+                            grid: { color: '#21262d', drawBorder: false },
+                            ticks: {
+                                color: '#8b949e',
+                                font: { family: 'Inter', size: 10 },
+                                callback: function(value) {
+                                    return (value * 100) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Count Up Micro-interaction
+        function countUp(elementId, targetValue, decimals = 0, prefix = "", suffix = "") {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            const start = parseFloat(el.getAttribute('data-val') || "0");
+            const end = parseFloat(targetValue);
+            if (start === end) {
+                el.textContent = prefix + end.toFixed(decimals) + suffix;
+                return;
+            }
+            el.setAttribute('data-val', end);
+            const duration = 600;
+            const startTime = performance.now();
+            
+            function update(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = progress * (2 - progress); // Ease out quad
+                const current = start + (end - start) * ease;
+                
+                el.textContent = prefix + current.toFixed(decimals) + suffix;
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            requestAnimationFrame(update);
+        }
+
+        // Helper to format currency (₹)
+        function formatRupees(val) {
+            return "₹" + parseFloat(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Core Update Loop
+        async function fetchAndUpdate() {
+            const refreshBtn = document.getElementById('refresh-button');
+            const offlineBanner = document.getElementById('offline-banner');
+            const sidebarDot = document.getElementById('sidebar-dot');
+            const sidebarText = document.getElementById('sidebar-api-text');
+            const sidebarStatus = document.getElementById('sidebar-api-status');
+            
+            refreshBtn.classList.add('spinning');
+            
+            try {
+                // Fetch endpoints concurrently
+                const [healthRes, statsRes, driftRes] = await Promise.all([
+                    fetch(`${API_BASE}/health`).then(res => res.json()).catch(() => null),
+                    fetch(`${API_BASE}/stats`).then(res => res.json()).catch(() => null),
+                    fetch(`${API_BASE}/drift`).then(res => res.json()).catch(() => null)
+                ]);
+
+                if (!healthRes || !statsRes || !driftRes) {
+                    throw new Error("API Offline");
+                }
+
+                // Hide offline banner & set status green
+                offlineBanner.style.display = "none";
+                sidebarStatus.classList.remove('offline');
+                sidebarText.textContent = "API: LIVE";
+                sidebarDot.className = "status-dot pulsing";
+                
+                // 1. Model Status Card
+                const statusCard = document.getElementById('card-model-status');
+                if (healthRes.status === "ok" && healthRes.model_loaded) {
+                    statusCard.textContent = "Active";
+                    statusCard.className = "card-value active";
+                } else {
+                    statusCard.textContent = "Error";
+                    statusCard.className = "card-value offline";
+                }
+
+                // 2. Count up Stat Cards
+                countUp('card-total-predictions', statsRes.total_predictions, 0);
+                countUp('card-fraud-rate', statsRes.fraud_rate_recent * 100, 2, "", "%");
+                countUp('card-avg-probability', statsRes.avg_fraud_probability_recent * 100, 2, "", "%");
+
+                // 3. Line Chart Probability Trend
+                const recentTxs = statsRes.recent_predictions;
+                const maxPoints = Math.min(recentTxs.length, 10);
+                
+                // Get the last 10 predictions and reverse them to display oldest -> newest
+                const trendSubset = recentTxs.slice(0, 10);
+                const trendChronological = [...trendSubset].reverse();
+                
+                const labels = trendChronological.map((_, i) => `Tx ${recentTxs.length - maxPoints + i + 1}`);
+                const dataPoints = trendChronological.map(tx => tx.fraud_probability);
+                
+                volumeChart.data.labels = labels.length > 0 ? labels : Array(10).fill('-');
+                volumeChart.data.datasets[0].data = dataPoints.length > 0 ? dataPoints : Array(10).fill(0);
+                volumeChart.update();
+
+                // 4. Drift Panel Alert Cards
+                const driftStateBox = document.getElementById('drift-state-box');
+                const driftBadge = document.getElementById('drift-status-badge');
+                
+                if (driftRes.drift_detected) {
+                    driftBadge.textContent = "Drift Detected";
+                    driftBadge.className = "drift-status-badge drifted";
+                    
+                    let alertsHTML = `<div class="drift-alerts-list">`;
+                    
+                    // Show standard feature mean shifts
+                    driftRes.alerts.forEach(alert => {
+                        alertsHTML += `
+                            <div class="drift-alert-item">
+                                <div class="drift-alert-desc">
+                                    <span class="drift-alert-title">${alert.feature} mean shift</span>
+                                    <span class="drift-alert-nums">Ref: ${alert.reference_mean} | Rec: ${alert.recent_mean}</span>
+                                </div>
+                                <span class="drift-alert-severity">${alert.severity}</span>
+                            </div>
+                        `;
+                    });
+
+                    // Target fraud rate shift alert
+                    if (driftRes.fraud_rate.flagged) {
+                        alertsHTML += `
+                            <div class="drift-alert-item" style="border-left-color: var(--accent-red)">
+                                <div class="drift-alert-desc">
+                                    <span class="drift-alert-title">Target Fraud Rate Spike</span>
+                                    <span class="drift-alert-nums">Baseline: ${(driftRes.fraud_rate.reference * 100).toFixed(3)}% | Rec: ${(driftRes.fraud_rate.recent * 100).toFixed(3)}%</span>
+                                </div>
+                                <span class="drift-alert-severity">critical</span>
+                            </div>
+                        `;
+                    }
+                    alertsHTML += `</div>`;
+                    driftStateBox.innerHTML = alertsHTML;
+                } else {
+                    driftBadge.textContent = "Stable";
+                    driftBadge.className = "drift-status-badge stable";
+                    driftStateBox.innerHTML = `
+                        <div class="drift-nominal-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            <span class="drift-nominal-title">All Systems Nominal</span>
+                            <span class="drift-nominal-sub">Feature distributions align with baseline parameters.</span>
+                        </div>
+                    `;
+                }
+
+                // Update baseline rate comparisons
+                const refRatePct = driftRes.fraud_rate.reference * 100;
+                const recRatePct = driftRes.fraud_rate.recent * 100;
+                document.getElementById('comparison-ref-val').textContent = refRatePct.toFixed(3) + "%";
+                document.getElementById('comparison-recent-val').textContent = recRatePct.toFixed(3) + "%";
+                
+                // Visual width adjustment (bounded to 100% max)
+                const refBarWidth = Math.min(refRatePct * 10, 100); 
+                const recBarWidth = Math.min(recRatePct * 10, 100);
+                document.getElementById('comparison-ref-bar').style.width = Math.max(refBarWidth, 2) + "%";
+                
+                const recBarEl = document.getElementById('comparison-recent-bar');
+                recBarEl.style.width = Math.max(recBarWidth, 2) + "%";
+                if (driftRes.fraud_rate.flagged) {
+                    recBarEl.className = "drift-bar-inner red";
+                } else {
+                    recBarEl.className = "drift-bar-inner";
+                }
+
+                // 5. Table Rows
+                const rowsContainer = document.getElementById('transaction-rows');
+                if (recentTxs.length === 0) {
+                    rowsContainer.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                No transactions logged yet.
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    let rowsHTML = "";
+                    // Display only last 10 rows
+                    const tableTxs = recentTxs.slice(0, 10);
+                    tableTxs.forEach(tx => {
+                        const shortId = tx.transaction_id.substring(0, 8);
+                        const isFraudBadge = tx.is_fraud 
+                            ? `<span class="pill-badge status-fraud">FRAUD</span>` 
+                            : `<span class="pill-badge status-normal">NORMAL</span>`;
+                        
+                        let riskClass = "risk-low";
+                        if (tx.risk_level === "high") riskClass = "risk-high";
+                        else if (tx.risk_level === "medium") riskClass = "risk-medium";
+                        
+                        const formattedTime = tx.timestamp ? new Date(tx.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '-';
+                        rowsHTML += `
+                            <tr>
+                                <td class="id-cell" title="${tx.transaction_id}">${shortId}...</td>
+                                <td>${formattedTime}</td>
+                                <td style="font-weight: 500;">${formatRupees(tx.amount)}</td>
+                                <td style="font-weight: 600;">${(tx.fraud_probability * 100).toFixed(2)}%</td>
+                                <td><span class="pill-badge ${riskClass}">${tx.risk_level}</span></td>
+                                <td>${isFraudBadge}</td>
+                            </tr>
+                        `;
+                    });
+                    rowsContainer.innerHTML = rowsHTML;
+                }
+
+                // Timestamp Update
+                const now = new Date();
+                document.getElementById('last-updated').textContent = "Last updated: " + now.toTimeString().split(' ')[0];
+
+            } catch (err) {
+                console.error("Dashboard update failed:", err);
+                
+                // Show offline banner
+                offlineBanner.style.display = "block";
+                sidebarStatus.className = "api-status offline";
+                sidebarText.textContent = "API: OFFLINE";
+                sidebarDot.className = "status-dot";
+                
+                // Set cards offline
+                document.getElementById('card-model-status').textContent = "Offline";
+                document.getElementById('card-model-status').className = "card-value offline";
+                document.getElementById('card-total-predictions').textContent = "-";
+                document.getElementById('card-fraud-rate').textContent = "-";
+                document.getElementById('card-avg-probability').textContent = "-";
+                
+                // Set drift error
+                const driftStateBox = document.getElementById('drift-state-box');
+                driftStateBox.innerHTML = `
+                    <div style="text-align: center; color: var(--accent-red); font-size: 0.85rem; padding: 2rem 0;">
+                        Unable to connect to monitoring service.
+                    </div>
+                `;
+            } finally {
+                setTimeout(() => {
+                    refreshBtn.classList.remove('spinning');
+                }, 400);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            fetchAndUpdate();
+            // Refreshes every 30 seconds
+            setInterval(fetchAndUpdate, 30000);
+        });
+    </script>
+</body>
+</html>

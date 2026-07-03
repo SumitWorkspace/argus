@@ -12,6 +12,13 @@ import joblib
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from typing import Optional
+
+class FeedbackRequest(BaseModel):
+    agent_decision: str
+    agent_confidence: float
+    human_verdict: str
+    notes: Optional[str] = None
 
 # Global model and scaler variables
 model = None
@@ -279,4 +286,111 @@ async def investigate_endpoint(transaction_id: str):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Investigation agent error: {str(e)}")
+
+
+@app.post("/feedback/{transaction_id}")
+async def post_feedback(transaction_id: str, request: FeedbackRequest):
+    """
+    Logs human feedback on the agent's risk decision for a transaction.
+    """
+    try:
+        feedback_entry = {
+            "transaction_id": transaction_id,
+            "agent_decision": request.agent_decision,
+            "agent_confidence": request.agent_confidence,
+            "human_verdict": request.human_verdict,
+            "notes": request.notes,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Append to agent_feedback.jsonl
+        feedback_path = "agent_feedback.jsonl"
+        with open(feedback_path, "a") as f:
+            f.write(json.dumps(feedback_entry) + "\n")
+            
+        return {"status": "success", "message": "Feedback recorded successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record feedback: {str(e)}")
+
+
+@app.get("/agent-accuracy")
+async def get_agent_accuracy():
+    """
+    Reads the human feedback logs and computes aggregate accuracy metrics,
+    including overall accuracy, decision breakdown, and rolling trends.
+    """
+    feedback_path = "agent_feedback.jsonl"
+    
+    # Initialize empty response structure
+    default_response = {
+        "total_feedback_count": 0,
+        "accuracy_rate": 0.0,
+        "breakdown": {
+            "block": {"correct": 0, "incorrect": 0},
+            "escalate": {"correct": 0, "incorrect": 0},
+            "dismiss": {"correct": 0, "incorrect": 0}
+        },
+        "rolling_accuracy": {
+            "last_10": 0.0,
+            "last_25": 0.0,
+            "all": 0.0
+        }
+    }
+    
+    if not os.path.exists(feedback_path):
+        return default_response
+        
+    entries = []
+    try:
+        with open(feedback_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        entries.append(json.loads(line))
+                    except Exception:
+                        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read feedback logs: {str(e)}")
+        
+    if not entries:
+        return default_response
+        
+    total_feedback_count = len(entries)
+    
+    # Calculate overall correctness
+    correct_count = sum(1 for e in entries if e.get("human_verdict") == "correct")
+    accuracy_rate = correct_count / total_feedback_count
+    
+    # Decision breakdown
+    breakdown = {
+        "block": {"correct": 0, "incorrect": 0},
+        "escalate": {"correct": 0, "incorrect": 0},
+        "dismiss": {"correct": 0, "incorrect": 0}
+    }
+    for e in entries:
+        dec = e.get("agent_decision", "").lower()
+        verd = e.get("human_verdict", "").lower()
+        if dec in breakdown and verd in ["correct", "incorrect"]:
+            breakdown[dec][verd] += 1
+            
+    # Rolling accuracy trends (last 10, last 25, and all feedback entries)
+    def calc_accuracy(subset):
+        if not subset:
+            return 0.0
+        corr = sum(1 for e in subset if e.get("human_verdict") == "correct")
+        return corr / len(subset)
+        
+    rolling_accuracy = {
+        "last_10": calc_accuracy(entries[-10:]),
+        "last_25": calc_accuracy(entries[-25:]),
+        "all": accuracy_rate
+    }
+    
+    return {
+        "total_feedback_count": total_feedback_count,
+        "accuracy_rate": accuracy_rate,
+        "breakdown": breakdown,
+        "rolling_accuracy": rolling_accuracy
+    }
+
 

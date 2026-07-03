@@ -217,3 +217,31 @@ async def get_dashboard():
     from fastapi.responses import FileResponse
     return FileResponse("dashboard.html")
 
+
+@app.post("/investigate/{transaction_index}")
+async def investigate_endpoint(transaction_index: int):
+    """
+    Runs the ReAct fraud investigation agent on a specified transaction.
+    """
+    try:
+        from agent_tools import _load_data
+        from investigation_agent import investigate_transaction
+        
+        df = _load_data()
+        if transaction_index < 0 or transaction_index >= len(df):
+            raise HTTPException(status_code=404, detail=f"Transaction index {transaction_index} not found in the dataset.")
+            
+        target_tx = df.iloc[transaction_index]
+        account_id = str(target_tx['account_id'])
+        before_time = float(target_tx['Time'])
+        
+        result = investigate_transaction(transaction_index, account_id, before_time)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+            
+        return result
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Investigation agent error: {str(e)}")
+

@@ -571,6 +571,105 @@
 
         .pill-badge.status-fraud { background-color: rgba(248, 81, 73, 0.1); color: var(--accent-red); border: 1px solid rgba(248, 81, 73, 0.25); }
         .pill-badge.status-normal { background-color: rgba(0, 200, 150, 0.1); color: var(--accent-teal); border: 1px solid rgba(0, 200, 150, 0.25); }
+
+        /* Investigation Agent UI Styles */
+        .investigate-btn {
+            background-color: rgba(88, 166, 255, 0.1);
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+        .investigate-btn:hover {
+            background-color: var(--accent-blue);
+            color: var(--bg-color);
+        }
+        .investigate-btn:disabled {
+            background-color: transparent;
+            border-color: var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .inline-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-blue);
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.35rem;
+            vertical-align: middle;
+        }
+        .investigation-result-container {
+            background-color: rgba(22, 27, 34, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .investigation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        .investigation-decision-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .decision-block {
+            background-color: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+        .decision-escalate {
+            background-color: rgba(210, 153, 34, 0.15);
+            color: var(--accent-orange);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+        .decision-dismiss {
+            background-color: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+        .investigation-confidence {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .investigation-rationale {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+        .investigation-tools-used {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            align-items: center;
+        }
+        .tool-tag {
+            background-color: rgba(188, 140, 255, 0.1);
+            color: var(--accent-purple);
+            border: 1px solid rgba(188, 140, 255, 0.25);
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -729,11 +828,12 @@
                                 <th>Fraud Probability</th>
                                 <th>Risk Level</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="transaction-rows">
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
                                     Waiting for prediction logs...
                                 </td>
                             </tr>
@@ -978,7 +1078,7 @@
                 if (recentTxs.length === 0) {
                     rowsContainer.innerHTML = `
                         <tr>
-                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
                                 No transactions logged yet.
                             </td>
                         </tr>
@@ -998,14 +1098,28 @@
                         else if (tx.risk_level === "medium") riskClass = "risk-medium";
                         
                         const formattedTime = tx.timestamp ? new Date(tx.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '-';
+                        
+                        const actionsCell = (tx.risk_level === "high" || tx.is_fraud)
+                            ? `<button class="investigate-btn" onclick="startInvestigation('${tx.transaction_id}', this)">Investigate</button>`
+                            : `<span style="color: var(--text-muted); font-size: 0.75rem;">-</span>`;
+
                         rowsHTML += `
-                            <tr>
+                            <tr id="tx-row-${tx.transaction_id}">
                                 <td class="id-cell" title="${tx.transaction_id}">${shortId}...</td>
                                 <td>${formattedTime}</td>
                                 <td style="font-weight: 500;">${formatRupees(tx.amount)}</td>
                                 <td style="font-weight: 600;">${(tx.fraud_probability * 100).toFixed(2)}%</td>
                                 <td><span class="pill-badge ${riskClass}">${tx.risk_level}</span></td>
                                 <td>${isFraudBadge}</td>
+                                <td>${actionsCell}</td>
+                            </tr>
+                        `;
+                        
+                        rowsHTML += `
+                            <tr id="tx-investigation-${tx.transaction_id}" style="display: none;">
+                                <td colspan="7" style="padding: 0 1rem 0.75rem 1rem; background-color: var(--surface-color) !important;">
+                                    <div id="investigation-content-${tx.transaction_id}"></div>
+                                </td>
                             </tr>
                         `;
                     });
@@ -1043,6 +1157,97 @@
                 setTimeout(() => {
                     refreshBtn.classList.remove('spinning');
                 }, 400);
+            }
+        }
+
+        // Investigation Agent client execution function
+        async function startInvestigation(txId, button) {
+            const rowId = `tx-investigation-${txId}`;
+            const contentId = `investigation-content-${txId}`;
+            const rowEl = document.getElementById(rowId);
+            const contentEl = document.getElementById(contentId);
+            
+            if (!rowEl || !contentEl) return;
+            
+            // Toggle off if already active and not executing
+            if (rowEl.style.display !== "none" && !button.disabled) {
+                rowEl.style.display = "none";
+                return;
+            }
+            
+            button.disabled = true;
+            const originalText = button.textContent;
+            button.innerHTML = `<span class="inline-spinner"></span>Investigating...`;
+            
+            rowEl.style.display = "table-row";
+            contentEl.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem;">
+                    <span class="inline-spinner" style="width: 16px; height: 16px; margin-right: 0.5rem;"></span>
+                    Running ReAct fraud analyst agent (Gemini)...
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`${API_BASE}/investigate/${txId}`, {
+                    method: "POST"
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const isRateLimit = response.status === 429 || 
+                                        errData.error === "rate_limit" ||
+                                        (errData.detail && errData.detail.error === "rate_limit") ||
+                                        (typeof errData.detail === "string" && errData.detail.includes("rate_limit"));
+                    if (isRateLimit) {
+                        throw new Error("rate_limit");
+                    }
+                    throw new Error(errData.detail || `Server error (Status ${response.status})`);
+                }
+                
+                const data = await response.json();
+                
+                let badgeClass = "decision-escalate";
+                if (data.decision === "block") badgeClass = "decision-block";
+                else if (data.decision === "dismiss") badgeClass = "decision-dismiss";
+                
+                const toolsHTML = data.tools_used.map(t => `<span class="tool-tag">${t}</span>`).join("");
+                
+                contentEl.innerHTML = `
+                    <div class="investigation-result-container">
+                        <div class="investigation-header">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Agent Decision:</span>
+                                <span class="investigation-decision-badge ${badgeClass}">${data.decision}</span>
+                            </div>
+                            <span class="investigation-confidence">Confidence: ${(data.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                        <div class="investigation-rationale">
+                            <strong>Rationale:</strong> ${data.rationale}
+                        </div>
+                        <div class="investigation-tools-used">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Tools Called:</span>
+                            ${toolsHTML || '<span style="color: var(--text-muted); font-size: 0.7rem;">None</span>'}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                console.error("Investigation failed:", err);
+                if (err.message === "rate_limit") {
+                    contentEl.innerHTML = `
+                        <div style="background-color: rgba(210, 153, 34, 0.1); border: 1px solid rgba(210, 153, 34, 0.3); border-radius: 6px; padding: 1rem; color: var(--accent-orange); font-size: 0.85rem;">
+                            <strong>⚠️ Agent Busy:</strong> Agent is temporarily busy, try again shortly.
+                        </div>
+                    `;
+                } else {
+                    contentEl.innerHTML = `
+                        <div style="background-color: rgba(248, 81, 73, 0.1); border: 1px solid rgba(248, 81, 73, 0.3); border-radius: 6px; padding: 1rem; color: var(--accent-red); font-size: 0.85rem;">
+                            <strong>⚠️ Agent Investigation Failed:</strong> ${err.message}
+                        </div>
+                    `;
+                }
+            } finally {
+                button.disabled = false;
+                button.textContent = originalText;
             }
         }
 

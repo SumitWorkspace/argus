@@ -76,33 +76,51 @@ TOOL_DEFINITIONS = [
                     "type": "string",
                     "description": "The unique identifier of the bank account (e.g., 'ACC_039')."
                 },
-                "transaction_index": {
-                    "type": "integer",
-                    "description": "The row index of the target transaction being investigated."
+                "transaction_id": {
+                    "type": "string",
+                    "description": "The unique UUID identifier of the target transaction being investigated."
                 },
                 "before_time": {
                     "type": "number",
                     "description": "The timestamp of the target transaction in seconds. Used as the historical cutoff to prevent data leakage."
                 }
             },
-            "required": ["account_id", "transaction_index", "before_time"]
+            "required": ["account_id", "transaction_id", "before_time"]
         }
     },
     {
         "name": "tool_get_model_score",
-        "description": "Scores a specific transaction at a given row index using the trained XGBoost model. Returns the predictive probability of fraud.",
+        "description": "Scores a specific transaction using the trained XGBoost model. Returns the predictive probability of fraud.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "transaction_index": {
-                    "type": "integer",
-                    "description": "The row index of the target transaction in the dataset."
+                "transaction_id": {
+                    "type": "string",
+                    "description": "The unique UUID identifier of the target transaction."
                 }
             },
-            "required": ["transaction_index"]
+            "required": ["transaction_id"]
         }
     }
 ]
+
+def _get_logged_transaction(transaction_id):
+    """
+    Helper to look up a transaction by ID in predictions_log.jsonl.
+    """
+    log_path = "predictions_log.jsonl"
+    if not os.path.exists(log_path):
+        raise FileNotFoundError(f"Log file '{log_path}' not found. Cannot retrieve transaction '{transaction_id}'.")
+    with open(log_path, 'r') as f:
+        for line in f:
+            if line.strip():
+                try:
+                    data = json.loads(line)
+                    if data.get("transaction_id") == transaction_id:
+                        return data
+                except Exception:
+                    pass
+    raise ValueError(f"Transaction ID '{transaction_id}' not found in prediction logs.")
 
 def tool_get_account_history(account_id, before_time):
     """
@@ -132,7 +150,7 @@ def tool_get_account_history(account_id, before_time):
     records = history_filtered.to_dict(orient='records')
     return records
 
-def tool_get_pattern_deviation(account_id, transaction_index, before_time):
+def tool_get_pattern_deviation(account_id, transaction_id, before_time):
     """
     Tool function to calculate behavioral deviation statistics.
 
@@ -140,8 +158,8 @@ def tool_get_pattern_deviation(account_id, transaction_index, before_time):
     -----------
     account_id : str
         The account identifier.
-    transaction_index : int
-        The row index of the transaction to evaluate.
+    transaction_id : str
+        The unique ID of the transaction to evaluate.
     before_time : float
         Filter cutoff timestamp.
 
@@ -151,37 +169,42 @@ def tool_get_pattern_deviation(account_id, transaction_index, before_time):
         Dictionary of deviation metrics.
     """
     df = _load_data()
-    if transaction_index < 0 or transaction_index >= len(df):
-        raise ValueError(f"Transaction index {transaction_index} out of bounds.")
+    tx_logged = _get_logged_transaction(transaction_id)
     
-    target_tx = df.iloc[transaction_index]
-    # Pass target transaction and dataframe to core logic
+    # Get mock merchant_category deterministically for this transaction_id
+    from investigation_context import get_mock_identity_for_id
+    _, merchant_category = get_mock_identity_for_id(transaction_id)
+    
+    # Construct a Series/dict representing the target transaction
+    target_tx = pd.Series({
+        'Time': float(tx_logged['time']),
+        'Amount': float(tx_logged['amount']),
+        'merchant_category': merchant_category
+    })
+    
+    # Pass target transaction and historical dataframe to core logic
     deviation = get_pattern_deviation(account_id, target_tx, df)
     return deviation
 
-def tool_get_model_score(transaction_index):
+def tool_get_model_score(transaction_id):
     """
     Tool function to score a transaction using the trained XGBoost model.
 
     Parameters:
     -----------
-    transaction_index : int
-        The row index of the transaction to evaluate.
+    transaction_id : str
+        The unique ID of the transaction to evaluate.
 
     Returns:
     --------
     dict
         Dictionary containing prediction results.
     """
-    df = _load_data()
-    if transaction_index < 0 or transaction_index >= len(df):
-        raise ValueError(f"Transaction index {transaction_index} out of bounds.")
-    
-    tx = df.iloc[transaction_index]
+    tx_logged = _get_logged_transaction(transaction_id)
     model, scaler = _load_model_artifacts()
     
     # 1. Scale numerical features (Time and Amount)
-    scaling_df = pd.DataFrame([[tx['Time'], tx['Amount']]], columns=['Time', 'Amount'])
+    scaling_df = pd.DataFrame([[float(tx_logged['time']), float(tx_logged['amount'])]], columns=['Time', 'Amount'])
     scaled_vals = scaler.transform(scaling_df)
     scaled_time = scaled_vals[0][0]
     scaled_amount = scaled_vals[0][1]
@@ -192,7 +215,8 @@ def tool_get_model_score(transaction_index):
         'Amount': scaled_amount,
     }
     for i in range(1, 29):
-        features_dict[f'V{i}'] = float(tx[f'V{i}'])
+        # Retrieve V1-V28 from the logged prediction entry
+        features_dict[f'V{i}'] = float(tx_logged[f'V{i}'])
         
     sample_df = pd.DataFrame([features_dict])
     feature_names = model.get_booster().feature_names
@@ -203,7 +227,7 @@ def tool_get_model_score(transaction_index):
     is_fraud_pred = bool(model.predict(sample_df)[0] == 1)
     
     return {
-        "transaction_index": int(transaction_index),
+        "transaction_id": transaction_id,
         "fraud_probability": fraud_probability,
         "predicted_class": int(is_fraud_pred)
     }
@@ -212,27 +236,61 @@ if __name__ == "__main__":
     # Test harness execution using index 541 (a known Class=1 fraud transaction)
     sample_idx = 541
     print("==================================================")
-    # Load dataset to verify target transaction information first
+    
+    # 1. Load raw transaction from dataset to prepare a log entry mock
     df = _load_data()
-    target_tx = df.iloc[sample_idx]
-    account_id = target_tx['account_id']
-    before_time = target_tx['Time']
-
-    print(f"Target transaction at index {sample_idx}:")
+    tx_raw = df.iloc[sample_idx]
+    
+    # Deterministic mock identities
+    from investigation_context import get_mock_identity_for_id
+    sample_id = "541-uuid-placeholder-for-test"
+    account_id, _ = get_mock_identity_for_id(sample_id)
+    before_time = float(tx_raw["Time"])
+    
+    print(f"Target transaction at index {sample_idx} mapped to UUID {sample_id}:")
     print(f"  Account ID: {account_id}")
     print(f"  Time: {before_time}")
-    print(f"  Amount: ${target_tx['Amount']:.2f}")
+    print(f"  Amount: ${tx_raw['Amount']:.2f}")
+    
+    # Build mock log entry matching the new predictions_log.jsonl format with V1-V28
+    log_entry = {
+        "transaction_id": sample_id,
+        "timestamp": "2026-07-03T04:00:00.000000+00:00",
+        "time": before_time,
+        "amount": float(tx_raw["Amount"]),
+        "fraud_probability": 0.9982,
+        "is_fraud": True,
+        "risk_level": "high"
+    }
+    for i in range(1, 29):
+        log_entry[f"V{i}"] = float(tx_raw[f"V{i}"])
+        
+    # Append the test transaction log entry if not exists
+    log_path = "predictions_log.jsonl"
+    existing_ids = []
+    if os.path.exists(log_path):
+        with open(log_path, 'r') as lf:
+            for line in lf:
+                if line.strip():
+                    try:
+                        existing_ids.append(json.loads(line).get("transaction_id"))
+                    except Exception:
+                        pass
+    if sample_id not in existing_ids:
+        with open(log_path, "a") as lf:
+            lf.write(json.dumps(log_entry) + "\n")
+            
     print("==================================================\n")
 
     # 1. Test Model Scoring Tool
     print("Testing tool_get_model_score...")
-    score_res = tool_get_model_score(sample_idx)
+    score_res = tool_get_model_score(sample_id)
     print(json.dumps(score_res, indent=2))
     print()
 
     # 2. Test Pattern Deviation Tool
     print("Testing tool_get_pattern_deviation...")
-    deviation_res = tool_get_pattern_deviation(account_id, sample_idx, before_time)
+    deviation_res = tool_get_pattern_deviation(account_id, sample_id, before_time)
     print(json.dumps(deviation_res, indent=2))
     print()
 

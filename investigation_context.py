@@ -213,6 +213,48 @@ def add_mock_identity_columns(df):
     df['merchant_category'] = categories_assigned
     return df
 
+
+def get_mock_identity_for_id(transaction_id):
+    """
+    [MOCK DATA SCAFFOLDING]
+    Consistently maps a string or UUID transaction_id to a mock account_id and merchant_category
+    using deterministic hashing. This ensures the same transaction always evaluates to the
+    same identity across tools and endpoints.
+    """
+    import hashlib
+    h = hashlib.sha256(str(transaction_id).encode('utf-8')).hexdigest()
+    val = int(h, 16)
+    
+    # 50 accounts: ACC_000 to ACC_049
+    num_accounts = 50
+    accounts = [f"ACC_{i:03d}" for i in range(num_accounts)]
+    acc_idx = val % num_accounts
+    account_id = accounts[acc_idx]
+    
+    # 10 merchant categories
+    merchant_categories = [
+        'groceries', 'gas_station', 'dining', 'online_retail', 'travel',
+        'entertainment', 'electronics', 'apparel', 'services', 'other'
+    ]
+    
+    # Preferred categories (3 per account, seeded consistently based on account index)
+    state = np.random.RandomState(acc_idx)
+    pref = state.choice(merchant_categories, size=3, replace=False)
+    
+    # Assign category with 85% preferred, 15% non-preferred
+    is_pref = (val // num_accounts) % 100 < 85
+    non_pref = [c for c in merchant_categories if c not in pref]
+    
+    if is_pref:
+        cat_idx = (val // (num_accounts * 100)) % len(pref)
+        merchant_category = pref[cat_idx]
+    else:
+        cat_idx = (val // (num_accounts * 100)) % len(non_pref)
+        merchant_category = non_pref[cat_idx]
+        
+    return account_id, merchant_category
+
+
 if __name__ == "__main__":
     import os
     if not os.path.exists(csv_path):

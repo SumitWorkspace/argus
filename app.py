@@ -174,7 +174,9 @@ async def predict(request: TransactionRequest):
             "is_fraud": is_fraud_pred,
             "risk_level": risk_level
         }
-        
+        for i in range(1, 29):
+            log_entry[f"V{i}"] = float(getattr(request, f"V{i}"))
+            
         with open("predictions_log.jsonl", "a") as f:
             f.write(json.dumps(log_entry) + "\n")
             
@@ -206,7 +208,23 @@ async def stats(n: int = 100):
     Returns general performance and volume metrics calculated from the logged transactions.
     """
     from drift_detector import get_prediction_stats
-    return get_prediction_stats(n_recent=n)
+    from agent_tools import _load_data
+    
+    stats_data = get_prediction_stats(n_recent=n)
+    
+    # Map each recent prediction to its closest transaction index in the original dataset based on timestamp Time
+    try:
+        df = _load_data()
+        for tx in stats_data.get("recent_predictions", []):
+            tx_time = tx.get("time")
+            if tx_time is not None:
+                # Find closest index matching Time value
+                closest_idx = int((df['Time'] - tx_time).abs().idxmin())
+                tx["transaction_index"] = closest_idx
+    except Exception as e:
+        print(f"Warning: Failed to map transaction indices: {e}")
+        
+    return stats_data
 
 
 @app.get("/dashboard")
@@ -218,25 +236,42 @@ async def get_dashboard():
     return FileResponse("dashboard.html")
 
 
-@app.post("/investigate/{transaction_index}")
-async def investigate_endpoint(transaction_index: int):
+@app.post("/investigate/{transaction_id}")
+async def investigate_endpoint(transaction_id: str):
     """
-    Runs the ReAct fraud investigation agent on a specified transaction.
+    Runs the ReAct fraud investigation agent on a logged transaction.
     """
     try:
-        from agent_tools import _load_data
         from investigation_agent import investigate_transaction
+        from investigation_context import get_mock_identity_for_id
+        import json
+        import os
         
-        df = _load_data()
-        if transaction_index < 0 or transaction_index >= len(df):
-            raise HTTPException(status_code=404, detail=f"Transaction index {transaction_index} not found in the dataset.")
+        # Load transaction details directly from predictions_log.jsonl
+        log_path = "predictions_log.jsonl"
+        target_tx = None
+        if os.path.exists(log_path):
+            with open(log_path, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            data = json.loads(line)
+                            if data.get("transaction_id") == transaction_id:
+                                target_tx = data
+                                break
+                        except Exception:
+                            pass
+                            
+        if not target_tx:
+            raise HTTPException(status_code=404, detail=f"Transaction ID {transaction_id} not found in the prediction logs.")
             
-        target_tx = df.iloc[transaction_index]
-        account_id = str(target_tx['account_id'])
-        before_time = float(target_tx['Time'])
+        account_id, _ = get_mock_identity_for_id(transaction_id)
+        before_time = float(target_tx['time'])
         
-        result = investigate_transaction(transaction_index, account_id, before_time)
+        result = investigate_transaction(transaction_id, account_id, before_time)
         if "error" in result:
+            if result.get("error") == "rate_limit":
+                raise HTTPException(status_code=429, detail={"error": "rate_limit", "message": result.get("message")})
             raise HTTPException(status_code=500, detail=result["error"])
             
         return result

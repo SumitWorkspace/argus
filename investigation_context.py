@@ -173,51 +173,48 @@ def get_pattern_deviation(account_id, transaction, transactions_df):
         "is_new_merchant_category": is_new_merchant
     }
 
+def add_mock_identity_columns(df):
+    """
+    [MOCK DATA SCAFFOLDING]
+    Adds synthetic 'account_id' and 'merchant_category' columns to the transaction DataFrame
+    to simulate production systems for testing.
+    """
+    print("Injecting mock 'account_id' and 'merchant_category' columns for verification...")
+    np.random.seed(42)
+    
+    # Define 50 synthetic accounts
+    num_accounts = 50
+    accounts = [f"ACC_{i:03d}" for i in range(num_accounts)]
+    df['account_id'] = np.random.choice(accounts, size=len(df))
+
+    # Define 10 merchant categories
+    merchant_categories = [
+        'groceries', 'gas_station', 'dining', 'online_retail', 'travel',
+        'entertainment', 'electronics', 'apparel', 'services', 'other'
+    ]
+
+    # Assign preferred categories to each account to model realistic usage patterns
+    account_pref = {}
+    for acc in accounts:
+        pref = np.random.choice(merchant_categories, size=3, replace=False)
+        account_pref[acc] = pref
+
+    # Assign category based on preferred categories (85% probability) or other categories (15%)
+    categories_assigned = []
+    for acc in df['account_id']:
+        pref = account_pref[acc]
+        non_pref = [c for c in merchant_categories if c not in pref]
+        if np.random.rand() < 0.85:
+            cat = np.random.choice(pref)
+        else:
+            cat = np.random.choice(non_pref)
+        categories_assigned.append(cat)
+
+    df['merchant_category'] = categories_assigned
+    return df
+
 if __name__ == "__main__":
     import os
-
-    def add_mock_identity_columns(df):
-        """
-        [MOCK DATA SCAFFOLDING]
-        Adds synthetic 'account_id' and 'merchant_category' columns to the transaction DataFrame
-        to simulate production systems for testing.
-        """
-        print("Injecting mock 'account_id' and 'merchant_category' columns for verification...")
-        np.random.seed(42)
-        
-        # Define 50 synthetic accounts
-        num_accounts = 50
-        accounts = [f"ACC_{i:03d}" for i in range(num_accounts)]
-        df['account_id'] = np.random.choice(accounts, size=len(df))
-
-        # Define 10 merchant categories
-        merchant_categories = [
-            'groceries', 'gas_station', 'dining', 'online_retail', 'travel',
-            'entertainment', 'electronics', 'apparel', 'services', 'other'
-        ]
-
-        # Assign preferred categories to each account to model realistic usage patterns
-        account_pref = {}
-        for acc in accounts:
-            pref = np.random.choice(merchant_categories, size=3, replace=False)
-            account_pref[acc] = pref
-
-        # Assign category based on preferred categories (85% probability) or other categories (15%)
-        categories_assigned = []
-        for acc in df['account_id']:
-            pref = account_pref[acc]
-            non_pref = [c for c in merchant_categories if c not in pref]
-            if np.random.rand() < 0.85:
-                cat = np.random.choice(pref)
-            else:
-                cat = np.random.choice(non_pref)
-            categories_assigned.append(cat)
-
-        df['merchant_category'] = categories_assigned
-        return df
-
-    # Load dataset
-    csv_path = "creditcard.csv"
     if not os.path.exists(csv_path):
         print(f"Error: Dataset '{csv_path}' not found in the current directory.")
     else:

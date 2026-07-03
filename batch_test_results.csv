@@ -1,0 +1,19 @@
+transaction_index,account_id,model_fraud_probability,agent_decision,agent_confidence,tools_used,rationale_summary
+138028,ACC_031,0.0036136603448539972,dismiss,0.99,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction amount of $0.76 is within the historical range of the account, and the merchant cate"
+63099,ACC_040,0.003727326402440667,dismiss,0.99,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction amount of $4.18 is within the historical range of the account, and the merchant cate"
+73411,ACC_032,0.0010101603111252189,dismiss,0.99,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction amount of $15.00 is within the typical range for this account, and the merchant cate"
+164247,ACC_036,0.007857267744839191,dismiss,0.99,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction amount of $57.00 is within the historical range of the account, and the merchant cat"
+148999,ACC_008,0.04129685461521149,dismiss,0.9,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction amount is $0.00, which is not unusual given the account history. The time since the "
+38488,ACC_034,0.00010307292541256174,dismiss,0.99,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction amount is within the normal range for the account, and the merchant category is not "
+6971,ACC_040,0.3606995642185211,escalate,0.7,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a high amount z-score of 8.933312666815592, indicating a significant deviation f"
+10497,ACC_022,0.35787153244018555,escalate,0.6,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a moderate fraud probability of 0.3579 and a low amount z-score of -0.4095, indi"
+22621,ACC_042,0.3140771687030792,escalate,0.7,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a moderate fraud probability of 0.314 and a low amount z-score of -0.2985, indic"
+78349,ACC_012,0.2087310403585434,dismiss,0.79,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score",The transaction amount of $0.76 is within the typical range of the account's historical transactions
+180120,ACC_036,0.2892283499240875,escalate,0.5,,
+150513,ACC_019,0.36889660358428955,escalate,0.7,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a moderate fraud probability of 0.37 and an amount z-score of 1.40, indicating a"
+17407,ACC_020,0.9997542500495911,block,0.9997542500495911,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a high fraud probability of 0.9997542500495911, indicating strong evidence of fr"
+12369,ACC_014,0.999800980091095,block,0.9999,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a very high model score of 0.999800980091095, indicating a strong likelihood of "
+143333,ACC_016,0.9997947812080383,block,0.9998,"tool_get_account_history,tool_get_pattern_deviation,tool_get_model_score","The transaction has a very high model score of 0.9997947812080383, indicating a strong likelihood of"
+149357,ACC_030,0.9982155561447144,escalate,0.5,,
+15225,ACC_022,0.9994565844535828,escalate,0.5,,
+74794,ACC_017,0.991428792476654,escalate,0.5,,

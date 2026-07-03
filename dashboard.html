@@ -571,6 +571,133 @@
 
         .pill-badge.status-fraud { background-color: rgba(248, 81, 73, 0.1); color: var(--accent-red); border: 1px solid rgba(248, 81, 73, 0.25); }
         .pill-badge.status-normal { background-color: rgba(0, 200, 150, 0.1); color: var(--accent-teal); border: 1px solid rgba(0, 200, 150, 0.25); }
+
+        /* Investigation Agent UI Styles */
+        .investigate-btn {
+            background-color: rgba(88, 166, 255, 0.1);
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+        .investigate-btn:hover {
+            background-color: var(--accent-blue);
+            color: var(--bg-color);
+        }
+        .investigate-btn:disabled {
+            background-color: transparent;
+            border-color: var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .inline-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-blue);
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.35rem;
+            vertical-align: middle;
+        }
+        .investigation-result-container {
+            background-color: rgba(22, 27, 34, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .investigation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        .investigation-decision-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .decision-block {
+            background-color: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+        .decision-escalate {
+            background-color: rgba(210, 153, 34, 0.15);
+            color: var(--accent-orange);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+        .decision-dismiss {
+            background-color: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+        .investigation-confidence {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .investigation-rationale {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+        .investigation-tools-used {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            align-items: center;
+        }
+        .tool-tag {
+            background-color: rgba(188, 140, 255, 0.1);
+            color: var(--accent-purple);
+            border: 1px solid rgba(188, 140, 255, 0.25);
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: monospace;
+        .feedback-btn {
+            background-color: transparent;
+            border-radius: 4px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+        .feedback-btn.correct {
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+        }
+        .feedback-btn.correct:hover {
+            background-color: var(--accent-green);
+            color: var(--bg-color);
+        }
+        .feedback-btn.incorrect {
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+        }
+        .feedback-btn.incorrect:hover {
+            background-color: var(--accent-red);
+            color: var(--bg-color);
+        }
+        .feedback-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -707,6 +834,78 @@
                                 </div>
                             </div>
                         </div>
+                </div>
+            </section>
+
+            <!-- Agent Accuracy Panel -->
+            <section class="panels-row" style="grid-template-columns: 1fr 1.3fr; margin-top: 1.5rem;" id="agent-accuracy-section">
+                <!-- Prominent accuracy stat card -->
+                <div class="panel" style="min-height: auto; justify-content: center;">
+                    <div class="panel-title-container">
+                        <div>
+                            <h3 class="panel-heading">Agent Decision Accuracy</h3>
+                            <p class="panel-subheading">Live human feedback evaluation metrics</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-around; padding: 1.5rem 0; gap: 1rem;">
+                        <div style="text-align: center;">
+                            <span class="card-label">Overall Accuracy</span>
+                            <div class="card-value" id="accuracy-overall-rate" style="font-size: 2.8rem; color: var(--accent-green); margin-top: 0.5rem;">0.00%</div>
+                            <span class="last-updated" id="accuracy-feedback-count" style="font-size: 0.75rem;">Total feedback: 0</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 120px;">
+                            <span class="card-label">Rolling Trends</span>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                                <span style="color: var(--text-muted);">Last 10:</span>
+                                <strong id="rolling-last-10">-</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                                <span style="color: var(--text-muted);">Last 25:</span>
+                                <strong id="rolling-last-25">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Decision breakdown table/cards -->
+                <div class="panel" style="min-height: auto;">
+                    <div class="panel-title-container">
+                        <div>
+                            <h3 class="panel-heading">Accuracy by Decision Type</h3>
+                            <p class="panel-subheading">Human verdicts categorized by agent action</p>
+                        </div>
+                    </div>
+                    <div class="table-container" style="margin-top: 0.5rem;">
+                        <table style="font-size: 0.8rem;">
+                            <thead>
+                                <tr>
+                                    <th>Agent Decision</th>
+                                    <th>Correct</th>
+                                    <th>Incorrect</th>
+                                    <th>Success Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="pill-badge decision-block">Block</span></td>
+                                    <td id="breakdown-block-correct">0</td>
+                                    <td id="breakdown-block-incorrect">0</td>
+                                    <td id="breakdown-block-rate" style="font-weight: 600;">-</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="pill-badge decision-escalate">Escalate</span></td>
+                                    <td id="breakdown-escalate-correct">0</td>
+                                    <td id="breakdown-escalate-incorrect">0</td>
+                                    <td id="breakdown-escalate-rate" style="font-weight: 600;">-</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="pill-badge decision-dismiss">Dismiss</span></td>
+                                    <td id="breakdown-dismiss-correct">0</td>
+                                    <td id="breakdown-dismiss-incorrect">0</td>
+                                    <td id="breakdown-dismiss-rate" style="font-weight: 600;">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>
@@ -729,11 +928,12 @@
                                 <th>Fraud Probability</th>
                                 <th>Risk Level</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="transaction-rows">
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
                                     Waiting for prediction logs...
                                 </td>
                             </tr>
@@ -978,7 +1178,7 @@
                 if (recentTxs.length === 0) {
                     rowsContainer.innerHTML = `
                         <tr>
-                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
                                 No transactions logged yet.
                             </td>
                         </tr>
@@ -998,14 +1198,28 @@
                         else if (tx.risk_level === "medium") riskClass = "risk-medium";
                         
                         const formattedTime = tx.timestamp ? new Date(tx.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '-';
+                        
+                        const actionsCell = (tx.risk_level === "high" || tx.is_fraud)
+                            ? `<button class="investigate-btn" onclick="startInvestigation('${tx.transaction_id}', this)">Investigate</button>`
+                            : `<span style="color: var(--text-muted); font-size: 0.75rem;">-</span>`;
+
                         rowsHTML += `
-                            <tr>
+                            <tr id="tx-row-${tx.transaction_id}">
                                 <td class="id-cell" title="${tx.transaction_id}">${shortId}...</td>
                                 <td>${formattedTime}</td>
                                 <td style="font-weight: 500;">${formatRupees(tx.amount)}</td>
                                 <td style="font-weight: 600;">${(tx.fraud_probability * 100).toFixed(2)}%</td>
                                 <td><span class="pill-badge ${riskClass}">${tx.risk_level}</span></td>
                                 <td>${isFraudBadge}</td>
+                                <td>${actionsCell}</td>
+                            </tr>
+                        `;
+                        
+                        rowsHTML += `
+                            <tr id="tx-investigation-${tx.transaction_id}" style="display: none;">
+                                <td colspan="7" style="padding: 0 1rem 0.75rem 1rem; background-color: var(--surface-color) !important;">
+                                    <div id="investigation-content-${tx.transaction_id}"></div>
+                                </td>
                             </tr>
                         `;
                     });
@@ -1046,11 +1260,209 @@
             }
         }
 
+        // Investigation Agent client execution function
+        async function startInvestigation(txId, button) {
+            const rowId = `tx-investigation-${txId}`;
+            const contentId = `investigation-content-${txId}`;
+            const rowEl = document.getElementById(rowId);
+            const contentEl = document.getElementById(contentId);
+            
+            if (!rowEl || !contentEl) return;
+            
+            // Toggle off if already active and not executing
+            if (rowEl.style.display !== "none" && !button.disabled) {
+                rowEl.style.display = "none";
+                return;
+            }
+            
+            button.disabled = true;
+            const originalText = button.textContent;
+            button.innerHTML = `<span class="inline-spinner"></span>Investigating...`;
+            
+            rowEl.style.display = "table-row";
+            contentEl.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem;">
+                    <span class="inline-spinner" style="width: 16px; height: 16px; margin-right: 0.5rem;"></span>
+                    Running ReAct fraud analyst agent (Gemini)...
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`${API_BASE}/investigate/${txId}`, {
+                    method: "POST"
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const isRateLimit = response.status === 429 || 
+                                        errData.error === "rate_limit" ||
+                                        (errData.detail && errData.detail.error === "rate_limit") ||
+                                        (typeof errData.detail === "string" && errData.detail.includes("rate_limit"));
+                    if (isRateLimit) {
+                        throw new Error("rate_limit");
+                    }
+                    throw new Error(errData.detail || `Server error (Status ${response.status})`);
+                }
+                
+                const data = await response.json();
+                
+                let badgeClass = "decision-escalate";
+                if (data.decision === "block") badgeClass = "decision-block";
+                else if (data.decision === "dismiss") badgeClass = "decision-dismiss";
+                
+                const toolsHTML = data.tools_used.map(t => `<span class="tool-tag">${t}</span>`).join("");
+                
+                contentEl.innerHTML = `
+                    <div class="investigation-result-container">
+                        <div class="investigation-header">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Agent Decision:</span>
+                                <span class="investigation-decision-badge ${badgeClass}">${data.decision}</span>
+                            </div>
+                            <span class="investigation-confidence">Confidence: ${(data.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                        <div class="investigation-rationale">
+                            <strong>Rationale:</strong> ${data.rationale}
+                        </div>
+                        <div class="investigation-tools-used" style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Tools Called:</span>
+                                ${toolsHTML || '<span style="color: var(--text-muted); font-size: 0.7rem;">None</span>'}
+                            </div>
+                            <div class="feedback-actions-container" id="feedback-actions-${txId}" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Is this decision correct?</span>
+                                <button class="feedback-btn correct" onclick="submitFeedback('${txId}', '${data.decision}', ${data.confidence}, 'correct')">Mark Correct</button>
+                                <button class="feedback-btn incorrect" onclick="submitFeedback('${txId}', '${data.decision}', ${data.confidence}, 'incorrect')">Mark Incorrect</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                console.error("Investigation failed:", err);
+                if (err.message === "rate_limit") {
+                    contentEl.innerHTML = `
+                        <div style="background-color: rgba(210, 153, 34, 0.1); border: 1px solid rgba(210, 153, 34, 0.3); border-radius: 6px; padding: 1rem; color: var(--accent-orange); font-size: 0.85rem;">
+                            <strong>⚠️ Agent Busy:</strong> Agent is temporarily busy, try again shortly.
+                        </div>
+                    `;
+                } else {
+                    contentEl.innerHTML = `
+                        <div style="background-color: rgba(248, 81, 73, 0.1); border: 1px solid rgba(248, 81, 73, 0.3); border-radius: 6px; padding: 1rem; color: var(--accent-red); font-size: 0.85rem;">
+                            <strong>⚠️ Agent Investigation Failed:</strong> ${err.message}
+                        </div>
+                    `;
+                }
+            } finally {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }
+
+        async function submitFeedback(txId, decision, confidence, verdict) {
+            const containerId = `feedback-actions-${txId}`;
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/feedback/${txId}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        agent_decision: decision,
+                        agent_confidence: confidence,
+                        human_verdict: verdict,
+                        notes: ""
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned status ${response.status}`);
+                }
+                
+                const badgeColor = verdict === 'correct' ? 'var(--accent-green)' : 'var(--accent-red)';
+                container.innerHTML = `
+                    <span style="font-size: 0.75rem; color: ${badgeColor}; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        ✓ Feedback recorded (${verdict})
+                    </span>
+                `;
+                
+                fetchAccuracyStats();
+            } catch (err) {
+                console.error("Failed to submit feedback:", err);
+                alert(`Error submitting feedback: ${err.message}`);
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        async function fetchAccuracyStats() {
+            try {
+                const response = await fetch(`${API_BASE}/agent-accuracy`);
+                if (!response.ok) throw new Error("API Offline");
+                const data = await response.json();
+                
+                const overallRateEl = document.getElementById('accuracy-overall-rate');
+                const feedbackCountEl = document.getElementById('accuracy-feedback-count');
+                const rolling10El = document.getElementById('rolling-last-10');
+                const rolling25El = document.getElementById('rolling-last-25');
+                
+                if (!overallRateEl) return;
+                
+                if (data.total_feedback_count === 0) {
+                    overallRateEl.textContent = "No Feedback";
+                    overallRateEl.style.color = "var(--text-muted)";
+                    feedbackCountEl.textContent = "No feedback recorded yet";
+                    rolling10El.textContent = "-";
+                    rolling25El.textContent = "-";
+                    
+                    ['block', 'escalate', 'dismiss'].forEach(dec => {
+                        document.getElementById(`breakdown-${dec}-correct`).textContent = "0";
+                        document.getElementById(`breakdown-${dec}-incorrect`).textContent = "0";
+                        document.getElementById(`breakdown-${dec}-rate`).textContent = "-";
+                    });
+                    return;
+                }
+                
+                const ratePct = data.accuracy_rate * 100;
+                overallRateEl.textContent = ratePct.toFixed(2) + "%";
+                if (ratePct >= 85) overallRateEl.style.color = "var(--accent-green)";
+                else if (ratePct >= 70) overallRateEl.style.color = "var(--accent-orange)";
+                else overallRateEl.style.color = "var(--accent-red)";
+                
+                feedbackCountEl.textContent = `Total feedback: ${data.total_feedback_count}`;
+                
+                rolling10El.textContent = (data.rolling_accuracy.last_10 * 100).toFixed(0) + "%";
+                rolling25El.textContent = (data.rolling_accuracy.last_25 * 100).toFixed(0) + "%";
+                
+                ['block', 'escalate', 'dismiss'].forEach(dec => {
+                    const stats = data.breakdown[dec] || { correct: 0, incorrect: 0 };
+                    document.getElementById(`breakdown-${dec}-correct`).textContent = stats.correct;
+                    document.getElementById(`breakdown-${dec}-incorrect`).textContent = stats.incorrect;
+                    
+                    const totalDec = stats.correct + stats.incorrect;
+                    if (totalDec > 0) {
+                        const decRate = (stats.correct / totalDec) * 100;
+                        document.getElementById(`breakdown-${dec}-rate`).textContent = decRate.toFixed(0) + "%";
+                    } else {
+                        document.getElementById(`breakdown-${dec}-rate`).textContent = "-";
+                    }
+                });
+            } catch (err) {
+                console.error("Failed to load accuracy statistics:", err);
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             initChart();
             fetchAndUpdate();
+            fetchAccuracyStats();
             // Refreshes every 30 seconds
             setInterval(fetchAndUpdate, 30000);
+            setInterval(fetchAccuracyStats, 30000);
         });
     </script>
 </body>

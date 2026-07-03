@@ -68,7 +68,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "tool_get_pattern_deviation",
-        "description": "Calculates statistical and lifestyle deviations of a specific transaction against the historical baseline of the account. Returns time since last transaction, transaction velocity, amount z-score, and new merchant category flags.",
+        "description": "Calculates statistical and lifestyle deviations of a specific transaction against the historical baseline of the account. Returns time since the account's previous transaction in minutes (time_since_last_transaction), transaction velocity in the last 60 minutes, amount z-score, and new merchant category flags.",
         "input_schema": {
             "type": "object",
             "properties": {
